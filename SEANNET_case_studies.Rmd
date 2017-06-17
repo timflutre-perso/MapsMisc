@@ -1,0 +1,123 @@
+---
+title: "Map of SEANNET case studies"
+author: "Timothée Flutre"
+date: "17/06/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+out.dir = Sys.getenv("HOME")
+if(Sys.info()["user"] == "marielcao"){
+  out.dir = paste0(out.dir, "/Desktop")
+}
+stopifnot(dir.exists(out.dir))
+```
+
+This document is available under the following license: Creative Commons Attribution-ShareAlike 4.0 International ([CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)).
+
+More information about the Southeast Asia Neighborhoods Network (SEANNET) projet is available [here](http://www.ukna.asia/seannet).
+
+Load packages:
+```{r}
+suppressPackageStartupMessages(library(rworldmap))
+```
+
+Retrieve the map of the world, and plot it, zooming in on the area of interest:
+```{r}
+map1 <- getMap(resolution = "low")
+xlim = c(105, 138)
+ylim = c(-9.2, 28)
+plot(map1, xlim=xlim, ylim=ylim, asp=1)
+```
+
+Get country codes in the ISO 3 format ([source](http://www.nationsonline.org/oneworld/country_code_list.htm)):
+```{r}
+(country.codes = setNames(c("THA", "MMR", "VNM", "PHL", "IDN"),
+                         c("Thailand", "Myanmar", "Viet Nam", "Philippines", "Indonesia")))
+```
+
+Color these countries on the map:
+```{r}
+countries <- data.frame(country = country.codes,
+                        merge = rep(1, length(country.codes)))
+newmap <- joinCountryData2Map(countries,
+                              joinCode = "ISO3",
+                              nameJoinColumn = "country")
+mapCountryData(mapToPlot = newmap,
+               xlim=xlim, ylim=ylim,
+               nameColumnToPlot = "merge",
+               catMethod = "categorical",
+               colourPalette = rep("grey", nrow(countries)),
+               borderCol = "black",
+               mapTitle = "SEANNET case studies",
+               addLegend = FALSE)
+```
+
+Get city GPS coordinates ([source](https://itouchmap.com/latlong.html)):
+```{r}
+(cities = data.frame(city = c("Chiang Mai", "Bangkok", "Mawlamyine", "Ho Chi Minh City", "Manila", "Surabaya"),
+                     neihborhood = c("Wu alai", "Wat Kae Nang Leong", "Aukkyin Ward", "Phu Nhuan", "Escolta Santa Cruz", "Kampung Peneleh"),
+                     country = c("Thailand", "Thailand", "Myanmar", "Viet Nam", "Philippines", "Indonesia"),
+                     lat = c(18.777932, 13.759305, 16.454317, 10.793254, 14.597931, -7.253189),
+                     lon = c(98.983931, 100.512226, 97.643961, 106.685185, 120.978653, 112.740538)))
+coordinates(cities) = c("lon", "lat")
+```
+
+Add cities to the map:
+```{r}
+plot(cities, xlim=xlim, ylim=ylim, type="n", col = "red", pch = 20)
+mapCountryData(mapToPlot = newmap,
+               xlim=xlim, ylim=ylim,
+               nameColumnToPlot = "merge",
+               catMethod = "categorical",
+               colourPalette = rep("grey", nrow(countries)),
+               borderCol = "black",
+               mapTitle = "SEANNET case studies",
+               addLegend = FALSE, add = T)
+plot(cities, col="red", add = TRUE, pch = 20)
+```
+
+Save in the PNG format:
+```{r}
+out.dir
+png(filename = paste0(out.dir, "/map_SEANNET_case_studies.png"),
+    title = "SEANNET case studies",
+    width = 15, height = 10, units = "cm", res = 500, pointsize = 12)
+par(mar = c(0, 0, 0, 0) + 0.2)
+plot(cities, xlim=xlim, ylim=ylim, type="n", col = "red", pch = 20)
+mapCountryData(mapToPlot = newmap,
+               xlim=xlim, ylim=ylim,
+               nameColumnToPlot = "merge",
+               catMethod = "categorical",
+               colourPalette = rep("grey", nrow(countries)),
+               borderCol = "black",
+               mapTitle = "",
+               addLegend = FALSE, add = T)
+plot(cities, col="red", add = T, pch = 20)
+dev.off()
+```
+
+This PNG file can be included in any media, as long as the following information is present ([details](https://wiki.creativecommons.org/wiki/Best_practices_for_attribution)):
+
+* author: `Timothée Flutre`;
+
+* source: `MapsMisc at github.com` or `https://github.com/timflutre-perso/MapsMisc`;
+
+* license: `CC BY-SA 4.0`.
+
+It can be a single line below the image:
+
+`Timothée Flutre (2017), MapsMisc at github.com, CC BY-SA 4.0`;
+
+or a sentence, such as:
+
+`Map of the SEANNET case studies by Timothée Flutre licensed under the Creative Commons Attribution-ShareAlike 4.0 license`.
+
+For something even shorter, the bare minimum would be:
+
+`T. Flutre (2017) CC BY-SA`.
+
+Enjoy!
+
+TF
