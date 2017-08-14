@@ -65,7 +65,7 @@ makeInteractiveMap <- function(photos.glob,
     msg <- "copy photos and load GPS coords..."
     write(msg, stdout())
   }
-  photos.dir <- paste0(out.dir, "/photos")
+  photos.dir <- paste0(out.dir, "/graphs") # name made compulsory by mapview::popupLocalImage()
   dir.create(photos.dir, showWarnings=FALSE)
   photos <- Sys.glob(photos.glob)
   if(length(photos) == 0){
