@@ -7,9 +7,9 @@
 ##' @param center.lng longitude of the map center
 ##' @param center.lat latitude of the map center
 ##' @param zoom zoom of the map
-##' @param provinces.file path to the file containing the provinces in GeoJSON format (can be NULL)
-##' @param photos.glob glob to find all photos to add to the map (can be NULL)
-##' @param cadastre.file path to the file containing the cadastre in GeoJSON format (can be NULL)
+##' @param provinces.file optional path to the file containing the provinces in GeoJSON format
+##' @param photos.glob optional glob to find all photos to add to the map, for instance \code{"photos/*.JPG"}
+##' @param cadastre.file optional path to the file containing the cadastre in GeoJSON format
 ##' @param out.dir path to the output directory (if NULL, will be the current directory)
 ##' @param thumbnails.width width of the thumbnail photos in the popups
 ##' @param thumbnails.height height of the thumbnail photos in the popups
@@ -25,13 +25,10 @@
 ##' source("makeInteractiveMap.R")
 ##'
 ##' ## set the paths to files (replace <...> by what works on your computer)
-##' provinces.file <- "<...>/<...>.geojson"
-##' photos.glob <- "<...>/*.JPG"
-##' cadastre.file <- "<...>/<...>.geojson"
-##' out.dir <- "<...>"
+##' prov.f <- "<...>/<...>.geojson"
 ##'
 ##' ## execute the function
-##' makeInteractiveMap(provinces.file, photos.glob, cadastre.file, out.dir)
+##' makeInteractiveMap(provinces.file=prov.f)
 ##'
 ##' ## open the html file in your web browser
 ##' }
@@ -140,7 +137,7 @@ makeInteractiveMap <- function(center.lng=108.194733,
   }
 
   if(! is.null(dat)){
-    ovl.groups <- c("Photos")
+    ovl.groups <- c(ovl.groups, "Photos")
     for(i in 1:nrow(dat))
       m <- leaflet::addMarkers(
                         m, lng=dat$GPSLongitude[i], lat=dat$GPSLatitude[i],
