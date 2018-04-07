@@ -7,14 +7,13 @@
 ##' @param center.lng longitude of the map center
 ##' @param center.lat latitude of the map center
 ##' @param zoom zoom of the map
-##' @param provinces.file optional path to the file containing the provinces in GeoJSON format
-##' @param photos.glob optional glob to find all photos to add to the map, for instance \code{"photos/*.JPG"}
+##' @param geojsons to add layers with polygons, list whose components are lists with compulsory attributes 'name' (for the legend) and 'file' (in geoJSON format), and optional attributes 'weight' and 'color'
+##' @param jpegs to add layers of markers with georeferenced photos, list whose components are lists with compulsory attributes 'name' (for the legend) and 'glob'
 ##' @param img.max.height maximum height in pixels for the output images (if NULL, no proportional resizing will be performed)
-##' @param cadastre.file optional path to the file containing the cadastre in GeoJSON format
 ##' @param out.dir path to the output directory (if NULL, will be the current directory)
 ##' @param thumbnails.width width of the thumbnail photos in the popups
 ##' @param thumbnails.height height of the thumbnail photos in the popups
-##' @param verbose verbosity level (0/1)
+##' @param verbose verbosity level (0/1/2)
 ##' @return invisible leaflet map
 ##' @author Timothee Flutre
 ##' @examples
@@ -26,10 +25,11 @@
 ##' source("makeInteractiveMap.R")
 ##'
 ##' ## set the paths to files (replace <...> by what works on your computer)
-##' prov.f <- "<...>/<...>.geojson"
+##' geojsons <- list(list(name="Provinces",
+##'                       file="<...>/<...>.geojson"))
 ##'
 ##' ## execute the function
-##' makeInteractiveMap(provinces.file=prov.f)
+##' makeInteractiveMap(geojsons=geojsons)
 ##'
 ##' ## open the html file in your web browser
 ##' }
@@ -37,113 +37,66 @@
 makeInteractiveMap <- function(center.lng=108.194733,
                                center.lat=16.049377,
                                zoom=5,
-                               provinces.file=NULL,
-                               photos.glob=NULL,
+                               geojsons=NULL,
+                               jpegs=NULL,
                                img.max.height=1200,
-                               cadastre.file=NULL,
                                out.dir=NULL,
-                               thumbnails.width=400, thumbnails.height=300,
+                               thumbnails.width=400,
+                               thumbnails.height=300,
                                verbose=1){
+  ## check inputs
   if(is.null(out.dir))
     out.dir <- paste0(getwd(), "/interactive-map")
   if(dir.exists(out.dir)){
     msg <- paste0("output directory '", out.dir, "' already exists")
     stop(msg)
   }
-  requireNamespace("leaflet")
-  requireNamespace("htmlwidgets")
-  if(! is.null(photos.glob) & ! is.null(img.max.height))
-    requireNamespace("magick")
-  if(! is.null(provinces.file)){
-    if(! file.exists(provinces.file)){
-      msg <- paste0("provinces.file '", provinces.file, "' doesn't exist")
-      warning(msg, immediate.=TRUE)
-      provinces.file <- NULL
-    }
-  }
-  if(! is.null(cadastre.file)){
-    if(! file.exists(cadastre.file)){
-      msg <- paste0("cadastre.file '", cadastre.file, "' doesn't exist")
-      warning(msg, immediate.=TRUE)
-      cadastre.file <- NULL
-    }
-  }
-  if(! is.null(provinces.file) | ! is.null(cadastre.file))
-    requireNamespace("geojsonio")
-  if(! is.null(photos.glob)){
-    requireNamespace("exifr")
-    requireNamespace("mapview")
-  }
+  stopifnot(requireNamespace("leaflet"))
+  stopifnot(requireNamespace("htmlwidgets"))
+  if(! is.null(geojsons))
+    stopifnot(is.list(geojsons),
+              all(sapply(geojsons, class) == "list"),
+              all(sapply(geojsons, function(x){
+                ! is.null(names(x))
+              })),
+              all(sapply(geojsons, function(x){
+                all(c("name","file") %in% names(x))
+              })),
+              all(sapply(geojsons, function(x){
+                is.character(x[["name"]])
+              })),
+              all(sapply(geojsons, function(x){
+                is.character(x[["file"]])
+              })),
+              requireNamespace("geojsonio"))
+  if(! is.null(jpegs))
+    stopifnot(is.list(jpegs),
+              all(sapply(jpegs, class) == "list"),
+              all(sapply(jpegs, function(x){
+                ! is.null(names(x))
+              })),
+              all(sapply(jpegs, function(x){
+                all(c("name","glob") %in% names(x))
+              })),
+              all(sapply(jpegs, function(x){
+                is.character(x[["name"]])
+              })),
+              all(sapply(jpegs, function(x){
+                is.character(x[["glob"]])
+              })),
+              requireNamespace("exifr"),
+              requireNamespace("mapview"))
+  if(! is.null(jpegs) & ! is.null(img.max.height))
+    stopifnot(requireNamespace("magick"))
 
+  ## create out dir
   if(verbose > 0){
     msg <- paste0("create the output directory '", out.dir, "'...")
     write(msg, stdout())
   }
   dir.create(out.dir)
 
-  prov <- NULL
-  if(! is.null(provinces.file)){
-    if(verbose > 0){
-      msg <- "load the provinces..."
-      write(msg, stdout())
-    }
-    prov <- geojsonio::geojson_read(provinces.file, what="sp")
-  }
-
-  dat <- NULL
-  if(! is.null(photos.glob)){
-    if(verbose > 0){
-      msg <- "copy photos and load GPS coords..."
-      write(msg, stdout())
-    }
-    photos.dir <- paste0(out.dir, "/graphs") # name made compulsory by mapview::popupLocalImage()
-    dir.create(photos.dir, showWarnings=FALSE)
-    photos <- Sys.glob(photos.glob)
-    if(length(photos) == 0){
-      msg <- "no photos were found, check 'photos.glob'"
-      warning(msg)
-    } else{
-      if(is.null(img.max.height)){
-        file.copy(photos, photos.dir)
-      } else{
-        isImgToTall <- function(img, img.max.height){
-          magick::image_info(img)$height > img.max.height
-        }
-        for(i in seq_along(photos)){
-          img <- magick::image_read(photos[i])
-          if(isImgToTall(img, img.max.height))
-            img <- magick::image_scale(img, paste0("x", img.max.height))
-          p2f.new <- paste0(photos.dir, "/", basename(photos[i]))
-          stopifnot(! file.exists(p2f.new))
-          magick::image_write(img, path=p2f.new, format="jpeg")
-        }
-      }
-      tmp <- list.files(photos.dir, full.names=TRUE)
-      dat <- exifr::read_exif(tmp, recursive=FALSE,
-                              quiet=ifelse(verbose <= 0, TRUE, FALSE))
-      stopifnot(all(c("SourceFile", "DateTimeOriginal", "GPSLongitude",
-                      "GPSLatitude") %in% colnames(dat)))
-      dat <- dat[, c("SourceFile", "DateTimeOriginal",
-                     "GPSLongitude", "GPSLatitude")]
-      has.coords <- ! is.na(dat$GPSLongitude) & ! is.na(dat$GPSLatitude)
-      if(! any(has.coords)){
-        msg <- "no photo has GPS coordinate"
-        dat <- NULL
-        warning(msg)
-      } else
-        dat <- dat[which(has.coords),]
-    }
-  }
-
-  cad <- NULL
-  if(! is.null(cadastre.file)){
-    if(verbose > 0){
-      msg <- "load the cadastre..."
-      write(msg, stdout())
-    }
-    cad <- geojsonio::geojson_read(cadastre.file, what="sp")
-  }
-
+  ## make the map
   if(verbose > 0){
     msg <- "make the map..."
     write(msg, stdout())
@@ -157,37 +110,125 @@ makeInteractiveMap <- function(center.lng=108.194733,
 
   ovl.groups <- c()
 
-  if(! is.null(prov)){
-    ovl.groups <- c(ovl.groups, "Provinces")
-    m <- leaflet::addPolygons(m, data=prov, stroke=TRUE, group="Provinces",
-                              fill=FALSE, weight=2)
+  ## add layers of polygons
+  if(! is.null(geojsons)){
+    for(i in seq_along(geojsons)){
+      if(verbose > 0){
+        msg <- paste0("handle geojson ", i, "/", length(geojsons),
+                      " '", geojsons[[i]]$name, "'...")
+        write(msg, stdout())
+      }
+      if(file.exists(geojsons[[i]]$file)){
+        tmp <- geojsonio::geojson_read(geojsons[[i]]$file, what="sp")
+        wt <- ifelse("weight" %in% names(geojsons[[i]]),
+                     geojsons[[i]]$weight[1],
+                     1)
+        col <- ifelse("color" %in% names(geojsons[[i]]),
+                      geojsons[[i]]$color[1],
+                      "#03F")
+        m <- leaflet::addPolygons(
+                          m,
+                          data=tmp,
+                          group=geojsons[[i]]$name,
+                          stroke=TRUE,
+                          fill=FALSE,
+                          weight=wt,
+                          color=col)
+        ovl.groups <- c(ovl.groups, geojsons[[i]]$name)
+      } else{
+        msg <- paste0("skip it because file '", geojsons[[i]]$file,
+                      "' doesn't exist")
+        warning(msg, call.=FALSE, immediate.=TRUE)
+      }
+    }
   }
 
-  if(! is.null(dat)){
-    ovl.groups <- c(ovl.groups, "Photos")
-    for(i in 1:nrow(dat))
-      m <- leaflet::addMarkers(
-                        m, lng=dat$GPSLongitude[i], lat=dat$GPSLatitude[i],
-                        group="Photos",
-                        popup=mapview::popupImage(
-                                           paste0(basename(photos.dir), "/",
-                                                  basename(dat$SourceFile[i])),
-                                           src="local",
-                                           height=thumbnails.height,
-                                           width=thumbnails.width))
-  }
+  ## add layers of markers for photos
+  if(! is.null(jpegs)){
+    for(i in seq_along(jpegs)){
+      if(verbose > 0){
+        msg <- paste0("handle jpegs ", i, "/", length(jpegs),
+                      " '", jpegs[[i]]$name, "'...")
+        write(msg, stdout())
+      }
 
-  if(! is.null(cad)){
-    ovl.groups <- c(ovl.groups, "Cadastre")
-    m <- leaflet::addPolygons(m, data=cad, stroke=TRUE, group="Cadastre",
-                              fill=FALSE, weight=1, color="#444444")
-  }
+      ## copy photos (and eventually resize)
+      photos.dir <- paste0(out.dir, "/img", i, "/graphs") # name made compulsory by mapview::popupLocalImage()
+      dir.create(photos.dir, showWarnings=FALSE, recursive=TRUE)
+      photos <- Sys.glob(jpegs[[i]]$glob)
+      if(length(photos) == 0){
+        msg <- "skip it because no photos were found"
+        warning(msg, call.=FALSE, immediate.=TRUE)
+        unlink(paste0(out.dir, "/img", i), recursive=TRUE)
+        next
+      }
+      if(verbose > 0){
+        msg <- paste0(length(photos), " photo",
+                      ifelse(length(photos) == 1, "", "s"), " found")
+        write(msg, stdout())
+      }
+      if(is.null(img.max.height)){
+        file.copy(photos, photos.dir)
+      } else{
+        isImgToTall <- function(img, img.max.height){
+          magick::image_info(img)$height > img.max.height
+        }
+        for(j in seq_along(photos)){
+          img <- magick::image_read(photos[j])
+          if(isImgToTall(img, img.max.height))
+            img <- magick::image_scale(img, paste0("x", img.max.height))
+          p2f.new <- paste0(photos.dir, "/", basename(photos[j]))
+          stopifnot(! file.exists(p2f.new))
+          magick::image_write(img, path=p2f.new, format="jpeg")
+        }
+      }
 
+      ## extract GPS coords
+      tmp <- list.files(photos.dir, full.names=TRUE)
+      dat <- exifr::read_exif(tmp, recursive=FALSE,
+                              quiet=ifelse(verbose <= 1, TRUE, FALSE))
+      stopifnot(all(c("SourceFile", "DateTimeOriginal", "GPSLongitude",
+                      "GPSLatitude") %in% colnames(dat)))
+      dat <- dat[, c("SourceFile", "DateTimeOriginal",
+                     "GPSLongitude", "GPSLatitude")]
+      has.coords <- ! is.na(dat$GPSLongitude) & ! is.na(dat$GPSLatitude)
+      if(! any(has.coords)){
+        msg <- "skip it because no photo has GPS coordinate"
+        dat <- NULL
+        warning(msg, call.=FALSE, immediate.=TRUE)
+        unlink(photos.dir, recursive=TRUE)
+        next
+      }
+      dat <- dat[which(has.coords),]
+
+      ## add marker(s)
+      for(j in 1:nrow(dat)){
+        p2f <- paste0("img", i, "/graphs/",
+                      basename(dat$SourceFile[j]))
+        m <- leaflet::addMarkers(
+                          m,
+                          group=jpegs[[i]]$name,
+                          lng=dat$GPSLongitude[j],
+                          lat=dat$GPSLatitude[j],
+                          popup=mapview::popupImage(
+                                             p2f,
+                                             src="local",
+                                             height=thumbnails.height,
+                                             width=thumbnails.width))
+      }
+      ovl.groups <- c(ovl.groups, jpegs[[i]]$name)
+
+    } # end of "for i in jpegs"
+  } # end of "if jpegs not NULL"
+
+  ## add layers controls
   m <- leaflet::addLayersControl(
-                    m, baseGroups=c("OSM (default)", "CartoDB"),
+                    m,
+                    baseGroups=c("OSM (default)", "CartoDB"),
                     overlayGroups=ovl.groups,
                     options=leaflet::layersControlOptions(collapsed=FALSE))
 
+  ## save the map
   if(verbose > 0){
     msg <- "save the map..."
     write(msg, stdout())
