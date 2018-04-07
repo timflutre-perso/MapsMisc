@@ -73,7 +73,8 @@ makeInteractiveMap <- function(center.lng=108.194733,
               all(sapply(geojsons, function(x){
                 is.character(x[["file"]])
               })),
-              requireNamespace("geojsonio"))
+              ## requireNamespace("geojsonio"))
+              requireNamespace("sf"))
   if(! is.null(jpegs))
     stopifnot(is.list(jpegs),
               all(sapply(jpegs, class) == "list"),
@@ -121,7 +122,7 @@ makeInteractiveMap <- function(center.lng=108.194733,
                                  leaflet::providers$CartoDB.Positron,
                                  group="CartoDB")
   tmp <- paste0("<p>",
-                ifelse(lang == "en", "Realized by", "Réalisé par"),
+                ifelse(lang == "en", "Realized by", "Réalisé par"), ":",
                 "<br />", author,
                 ", ", format.Date(Sys.Date(), format="%Y"),
                 ".</p>")
@@ -145,7 +146,10 @@ makeInteractiveMap <- function(center.lng=108.194733,
         write(msg, stdout())
       }
       if(file.exists(geojsons[[i]]$file)){
-        tmp <- geojsonio::geojson_read(geojsons[[i]]$file, what="sp")
+        ## tmp.sp <- geojsonio::geojson_read(geojsons[[i]]$file, what="sp")
+        tmp <- sf::st_read(geojsons[[i]]$file,
+                           quiet=ifelse(verbose <= 1, TRUE, FALSE))
+        tmp.sp <- methods::as(tmp, "Spatial")
         wt <- ifelse("weight" %in% names(geojsons[[i]]),
                      geojsons[[i]]$weight[1],
                      1)
@@ -154,7 +158,7 @@ makeInteractiveMap <- function(center.lng=108.194733,
                       "#03F")
         m <- leaflet::addPolygons(
                           m,
-                          data=tmp,
+                          data=tmp.sp,
                           group=geojsons[[i]]$name,
                           stroke=TRUE,
                           fill=FALSE,
