@@ -13,6 +13,8 @@
 ##' @param out.dir path to the output directory (if NULL, will be the current directory)
 ##' @param thumbnails.width width of the thumbnail photos in the popups
 ##' @param thumbnails.height height of the thumbnail photos in the popups
+##' @param author author of the map
+##' @param lang language (fr/en)
 ##' @param verbose verbosity level (0/1/2)
 ##' @return invisible leaflet map
 ##' @author Timothee Flutre
@@ -43,6 +45,8 @@ makeInteractiveMap <- function(center.lng=108.194733,
                                out.dir=NULL,
                                thumbnails.width=400,
                                thumbnails.height=300,
+                               author="<author>",
+                               lang="fr",
                                verbose=1){
   ## check inputs
   if(is.null(out.dir))
@@ -53,6 +57,7 @@ makeInteractiveMap <- function(center.lng=108.194733,
   }
   stopifnot(requireNamespace("leaflet"))
   stopifnot(requireNamespace("htmlwidgets"))
+  stopifnot(requireNamespace("htmltools"))
   if(! is.null(geojsons))
     stopifnot(is.list(geojsons),
               all(sapply(geojsons, class) == "list"),
@@ -88,6 +93,10 @@ makeInteractiveMap <- function(center.lng=108.194733,
               requireNamespace("mapview"))
   if(! is.null(jpegs) & ! is.null(img.max.height))
     stopifnot(requireNamespace("magick"))
+  stopifnot(is.character(author),
+            length(author) == 1,
+            is.character(lang),
+            lang %in% c("fr","en"))
 
   ## create out dir
   if(verbose > 0){
@@ -102,11 +111,28 @@ makeInteractiveMap <- function(center.lng=108.194733,
     write(msg, stdout())
   }
   m <- leaflet::leaflet()
-  m <- leaflet::setView(m, lng=center.lng, lat=center.lat, zoom=zoom)
-  m <- leaflet::addProviderTiles(m, leaflet::providers$OpenStreetMap)
-  m <- leaflet::addTiles(m, group="OSM (default)")
-  m <- leaflet::addProviderTiles(m, leaflet::providers$CartoDB.Positron,
+  m <- leaflet::setView(m,
+                        lng=center.lng, lat=center.lat, zoom=zoom)
+  m <- leaflet::addProviderTiles(m,
+                                 leaflet::providers$OpenStreetMap)
+  m <- leaflet::addTiles(m,
+                         group="OSM (default)")
+  m <- leaflet::addProviderTiles(m,
+                                 leaflet::providers$CartoDB.Positron,
                                  group="CartoDB")
+  tmp <- paste0("<p>",
+                ifelse(lang == "en", "Realized by", "Réalisé par"),
+                "<br />", author,
+                ", ", format.Date(Sys.Date(), format="%Y"),
+                ".</p>")
+  title <- htmltools::tags$div(htmltools::HTML(tmp))
+  m <- leaflet::addControl(m,
+                           html=title,
+                           position="bottomright")
+  m <- leaflet::addMiniMap(m,
+                           position="bottomleft",
+                           zoomLevelOffset=-6,
+                           toggleDisplay=TRUE)
 
   ovl.groups <- c()
 
