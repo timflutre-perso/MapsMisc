@@ -122,7 +122,7 @@ makeInteractiveMap <- function(center.lng=108.194733,
                                  leaflet::providers$CartoDB.Positron,
                                  group="CartoDB")
   tmp <- paste0("<p>",
-                ifelse(lang == "en", "Realized by", "Réalisé par"), ":",
+                ifelse(lang == "en", "Realized by:", "Réalisé par :"),
                 "<br />", author,
                 ", ", format.Date(Sys.Date(), format="%Y"),
                 ".</p>")
@@ -149,6 +149,7 @@ makeInteractiveMap <- function(center.lng=108.194733,
         ## tmp.sp <- geojsonio::geojson_read(geojsons[[i]]$file, what="sp")
         tmp <- sf::st_read(geojsons[[i]]$file,
                            quiet=ifelse(verbose <= 1, TRUE, FALSE))
+        tmp <- sf::st_zm(tmp)
         tmp.sp <- methods::as(tmp, "Spatial")
         wt <- ifelse("weight" %in% names(geojsons[[i]]),
                      geojsons[[i]]$weight[1],
@@ -223,13 +224,17 @@ makeInteractiveMap <- function(center.lng=108.194733,
                      "GPSLongitude", "GPSLatitude")]
       has.coords <- ! is.na(dat$GPSLongitude) & ! is.na(dat$GPSLatitude)
       if(! any(has.coords)){
-        msg <- "skip it because no photo has GPS coordinate"
+        msg <- "skip it because no photo has GPS coordinates"
         dat <- NULL
         warning(msg, call.=FALSE, immediate.=TRUE)
         unlink(photos.dir, recursive=TRUE)
         next
       }
-      dat <- dat[which(has.coords),]
+      if(! all(has.coords)){
+        msg <- paste0("only ", sum(has.coords), " have GPS coordinates")
+        warning(msg, call.=FALSE, immediate.=TRUE)
+        dat <- dat[which(has.coords),]
+      }
 
       ## add marker(s)
       for(j in 1:nrow(dat)){
