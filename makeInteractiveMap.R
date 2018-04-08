@@ -15,6 +15,7 @@
 ##' @param thumbnails.height height of the thumbnail photos in the popups
 ##' @param author author of the map
 ##' @param lang language (fr/en)
+##' @param author.url URL associated with the author
 ##' @param verbose verbosity level (0/1/2)
 ##' @return invisible leaflet map
 ##' @author Timothee Flutre
@@ -47,6 +48,7 @@ makeInteractiveMap <- function(center.lng=108.194733,
                                thumbnails.height=300,
                                author="<author>",
                                lang="fr",
+                               author.url=NULL,
                                verbose=1){
   ## check inputs
   if(is.null(out.dir))
@@ -98,6 +100,9 @@ makeInteractiveMap <- function(center.lng=108.194733,
             length(author) == 1,
             is.character(lang),
             lang %in% c("fr","en"))
+  if(! is.null(author.url))
+    stopifnot(is.character(author.url),
+              length(author.url) == 1)
 
   ## create out dir
   if(verbose > 0){
@@ -121,15 +126,25 @@ makeInteractiveMap <- function(center.lng=108.194733,
   m <- leaflet::addProviderTiles(m,
                                  leaflet::providers$CartoDB.Positron,
                                  group="CartoDB")
+
+  ## add author info
   tmp <- paste0("<p>",
-                ifelse(lang == "en", "Realized by:", "Réalisé par :"),
-                "<br />", author,
+                ifelse(lang == "en", "Made by:", "Réalisé par :"),
+                "<br />")
+  if(is.null(author.url)){
+    tmp <- paste0(tmp, author)
+  } else
+    tmp <- paste0(tmp,
+                  '<a href="', author.url, '">', author, '</a>')
+  tmp <- paste0(tmp,
                 ", ", format.Date(Sys.Date(), format="%Y"),
                 ".</p>")
   title <- htmltools::tags$div(htmltools::HTML(tmp))
   m <- leaflet::addControl(m,
                            html=title,
                            position="bottomright")
+
+  ## add mini map
   m <- leaflet::addMiniMap(m,
                            position="bottomleft",
                            zoomLevelOffset=-6,
