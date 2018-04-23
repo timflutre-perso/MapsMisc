@@ -7,7 +7,7 @@
 ##' @param center.lng longitude of the map center
 ##' @param center.lat latitude of the map center
 ##' @param zoom zoom of the map
-##' @param geojsons to add layers with polygons, list whose components are lists with compulsory attributes 'name' (for the legend) and 'file' (in geoJSON format), and optional attributes 'weight' and 'color'
+##' @param geojsons to add layers with polygons, list whose components are lists with compulsory attributes 'name' (for the legend) and 'file' (in geoJSON format), and optional attributes 'color' (default="#03F"), 'weight' (default=1), 'opacity' (default=0.5), 'fill' (default=FALSE), 'fillColor' (default="#808080"), 'fillOpacity' (default=0.2) and 'highlightOptions' (default=NULL)
 ##' @param jpegs to add layers of markers with georeferenced photos, list whose components are lists with compulsory attributes 'name' (for the legend) and 'glob'
 ##' @param img.max.height maximum height in pixels for the output images (if NULL, no proportional resizing will be performed)
 ##' @param out.dir path to the output directory (if NULL, will be the current directory)
@@ -166,20 +166,45 @@ makeInteractiveMap <- function(center.lng=108.194733,
                            quiet=ifelse(verbose <= 1, TRUE, FALSE))
         tmp <- sf::st_zm(tmp)
         tmp.sp <- methods::as(tmp, "Spatial")
-        wt <- ifelse("weight" %in% names(geojsons[[i]]),
-                     geojsons[[i]]$weight[1],
-                     1)
-        col <- ifelse("color" %in% names(geojsons[[i]]),
-                      geojsons[[i]]$color[1],
-                      "#03F")
+        polygon.color <-
+          ifelse("color" %in% names(geojsons[[i]]),
+                 geojsons[[i]]$color,
+                 "#03F")
+        polygon.weight <-
+          ifelse("weight" %in% names(geojsons[[i]]),
+                 geojsons[[i]]$weight,
+                 1)
+        polygon.opacity <-
+          ifelse("fill" %in% names(geojsons[[i]]),
+                 geojsons[[i]]$opacity,
+                 0.5)
+        polygon.fill <-
+          ifelse("fill" %in% names(geojsons[[i]]),
+                 geojsons[[i]]$fill,
+                 FALSE)
+        polygon.fillColor <-
+          ifelse("fill" %in% names(geojsons[[i]]),
+                 geojsons[[i]]$fillColor,
+                 "#808080")
+        polygon.fillOpacity <-
+          ifelse("fill" %in% names(geojsons[[i]]),
+                 geojsons[[i]]$fillOpacity,
+                 0.2)
+        polygon.highlightOptions <- NULL
+        if("highlightOptions" %in% names(geojsons[[i]]))
+          polygon.highlightOptions <- geojsons[[i]]$highlightOptions
         m <- leaflet::addPolygons(
                           m,
                           data=tmp.sp,
                           group=geojsons[[i]]$name,
                           stroke=TRUE,
-                          fill=FALSE,
-                          weight=wt,
-                          color=col)
+                          color=polygon.color,
+                          weight=polygon.weight,
+                          opacity=polygon.opacity,
+                          fill=polygon.fill,
+                          fillColor=polygon.fillColor,
+                          fillOpacity=polygon.fillOpacity,
+                          highlightOptions=polygon.highlightOptions)
         ovl.groups <- c(ovl.groups, geojsons[[i]]$name)
       } else{
         msg <- paste0("skip it because file '", geojsons[[i]]$file,
