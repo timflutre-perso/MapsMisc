@@ -8,11 +8,12 @@
 ##' @param center.lat latitude of the map center
 ##' @param zoom zoom of the map
 ##' @param geojsons to add layers with polygons, list whose components are lists with compulsory attributes 'name' (for the legend) and 'file' (in geoJSON format), and optional attributes 'color' (default="#03F"), 'weight' (default=1), 'opacity' (default=0.5), 'fill' (default=FALSE), 'fillColor' (default="#808080"), 'fillOpacity' (default=0.2) and 'highlightOptions' (default=NULL)
-##' @param jpegs to add layers of markers with georeferenced photos, list whose components are lists with compulsory attributes 'name' (for the legend) and 'glob'
+##' @param jpegs to add layers of markers with georeferenced photos, list whose components are lists with compulsory attributes 'name' (for the legend) and 'glob', and optional attribute 'icon' (requires \code{marker.icons})
 ##' @param img.max.height maximum height in pixels for the output images (if NULL, no proportional resizing will be performed)
 ##' @param out.dir path to the output directory (if NULL, will be the current directory)
 ##' @param thumbnails.width width of the thumbnail photos in the popups
 ##' @param thumbnails.height height of the thumbnail photos in the popups
+##' @param marker.icons output from [leaflet::iconList()] (optional, used for custom icons)
 ##' @param author author of the map
 ##' @param lang language (fr/en)
 ##' @param author.url URL associated with the author
@@ -37,6 +38,7 @@
 ##' ## open the html file in your web browser
 ##' }
 ##' @export
+##' @md
 makeInteractiveMap <- function(center.lng=108.194733,
                                center.lat=16.049377,
                                zoom=5,
@@ -46,6 +48,7 @@ makeInteractiveMap <- function(center.lng=108.194733,
                                out.dir=NULL,
                                thumbnails.width=400,
                                thumbnails.height=300,
+                               marker.icons=NULL,
                                author="<author>",
                                lang="fr",
                                author.url=NULL,
@@ -96,6 +99,10 @@ makeInteractiveMap <- function(center.lng=108.194733,
               requireNamespace("mapview"))
   if(! is.null(jpegs) & ! is.null(img.max.height))
     stopifnot(requireNamespace("magick"))
+  if(! is.null(marker.icons))
+    stopifnot(is.list(marker.icons),
+              class(marker.icons) == "leaflet_icon_set",
+              all(sapply(sapply(marker.icons, `[`, "iconUrl"), file.exists)))
   stopifnot(is.character(author),
             length(author) == 1,
             is.character(lang),
@@ -277,6 +284,17 @@ makeInteractiveMap <- function(center.lng=108.194733,
       }
 
       ## add marker(s)
+      marker.icon <- NULL
+      if(! is.null(marker.icons) &
+         "icon" %in% names(jpegs[[i]])){
+        if(jpegs[[i]]$icon %in% names(marker.icons))
+          marker.icon <- marker.icons[jpegs[[i]]$icon]
+        else{
+          msg <- paste0("icon '", jpegs[[i]]$icon,
+                        "' not found in marker.icons")
+          warning(msg, call.=FALSE, immediate.=TRUE)
+        }
+      }
       for(j in 1:nrow(dat)){
         p2f <- paste0("img", i, "/graphs/",
                       basename(dat$SourceFile[j]))
@@ -289,7 +307,8 @@ makeInteractiveMap <- function(center.lng=108.194733,
                                              p2f,
                                              src="local",
                                              height=thumbnails.height,
-                                             width=thumbnails.width))
+                                             width=thumbnails.width),
+                          icon=marker.icon)
       }
       ovl.groups <- c(ovl.groups, jpegs[[i]]$name)
 
